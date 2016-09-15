@@ -1,9 +1,16 @@
 import sqlite3
+import os
 
 
 class DBManager:
     def __init__(self, db):
         self.db = db
+        self.init_base()
+
+    def init_base(self):
+        if not os.path.exists(self.db):
+            open(self.db, 'a').close()
+            self.execute("CREATE TABLE agents (name text, city text)", tuple())
 
     def execute(self, query, values, many=False):
         connection = sqlite3.connect(self.db)
