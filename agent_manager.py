@@ -5,14 +5,14 @@ import ngram
 import pylev
 from db_manager import DBManager
 from city_manager import CityManager, CityError
+from config import Config
 
 
 class AgentManager:
     def __init__(self):
-        self.config = configparser.ConfigParser()
-        self.config.read('config.cfg')
-        self.db_manager = DBManager(self.config['database']['name'])
-        self.city_manager = CityManager(self.config['google_maps_api']['key'])
+        config = Config.config
+        self.db_manager = DBManager(config['database']['name'])
+        self.city_manager = CityManager(config['google_maps_api']['key'])
 
     async def add_agent(self, name, city):
         agent = self.db_manager.find_agent_by_name(name)
@@ -65,6 +65,8 @@ class AgentManager:
         next(agent_reader, None)  # skip headers
         count = 0
         for row in agent_reader:
+            if not row:
+                continue
             await self.add_agent(row[0], row[1])
             count += 1
         return count
@@ -73,11 +75,10 @@ class AgentManager:
         agents = self.db_manager.get_all_agents()
         filepath = os.path.join('public/', filename)
         if agents:
-            with open(filepath, mode='w', newline='', encoding='utf-8') as csvfile:
-                agent_writer = csv.writer(csvfile, delimiter=',', quotechar='|', )
+            with open(filepath, mode='w', encoding='utf-8', newline='') as csvfile:
+                agent_writer = csv.writer(csvfile, delimiter=',')
                 agent_writer.writerow(['city', 'name'])
-                for agent in agents:
-                    agent_writer.writerow(list(agent))
+                agent_writer.writerows([list(elem) for elem in agents])
         return filepath
 
     async def end_seans(self):
