@@ -1,5 +1,6 @@
 import aiohttp
 import json
+import math
 
 
 class CityError(Exception):
@@ -45,11 +46,17 @@ class CityManager:
             else:
                 if result["status"] != "OK":
                     raise CityError
+                else:
+                    lat = result["results"][0]["geometry"]["location"]["lat"]
+                    lng = result["results"][0]["geometry"]["location"]["lng"]
+                    self.city_list[city] = {}
+                    self.city_list[city]["coordinates"] = {"lat": lat, "lng": lng}
 
     async def calculate_nearest_city(self, origin):
         nearest_city = None
         min_dist = float('inf')
         destinations = list(self.city_list.keys())
+        destinations = [x for x in destinations if x != origin]
 
         if destinations:
             dst_str = '|'.join(destinations)
@@ -63,13 +70,41 @@ class CityManager:
                 except json.decoder.JSONDecodeError as e:
                     print(e)
                 else:
-                    for (dst, distance) in zip(destinations, result["rows"][0]["elements"]):
-                        if min_dist > distance["distance"]["value"]:
-                            min_dist = distance["distance"]["value"]
-                            nearest_city = dst
+                    if result["rows"][0]["elements"][0]["status"] != "OK":
+                        nearest_city, min_dist = await self.alternative_nearest(origin, destinations)
+                    else:
+                        for (dst, distance) in zip(destinations, result["rows"][0]["elements"]):
+                            if min_dist > distance["distance"]["value"]:
+                                min_dist = distance["distance"]["value"]
+                                nearest_city = dst
                     if self.city_list[nearest_city]["nearest_city"][1] > min_dist:
                         self.city_list[nearest_city]["nearest_city"] = (origin, min_dist)
-        self.city_list[origin] = {"nearest_city": (nearest_city, min_dist)}
+        self.city_list[origin]["nearest_city"] = (nearest_city, min_dist)
+
+    async def alternative_nearest(self, origin, destination):
+        nearest_city = None
+        min_dist = float('inf')
+
+        for dst in destination:
+            distance = await self.distance_calculate(self.city_list[origin]["coordinates"],
+                                                     self.city_list[dst]["coordinates"])
+            if min_dist > distance:
+                min_dist = distance
+                nearest_city = dst
+        return nearest_city, min_dist
+
+    async def distance_calculate(self, origin, destination):
+        earth_radius = 6378.137e3  # use Equatorial radius
+        lat1 = math.radians(origin["lat"])
+        lat2 = math.radians(destination['lat'])
+        delta_lat = math.radians(destination['lat'] - origin["lat"])
+        delta_lng = math.radians(destination['lng'] - origin["lng"])
+
+        a = math.sin(delta_lat / 2) * math.sin(delta_lat / 2) + math.cos(lat1) * math.cos(lat2) * math.sin(
+            delta_lng / 2) * math.sin(delta_lng / 2)
+        c = 2 * math.atan2(math.sqrt(a), math.sqrt((1 - a)))
+        distance = earth_radius * c
+        return distance
 
     async def find_nearest_city(self, city):
         if self.city_list[city]["links"] > 1:
