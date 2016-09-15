@@ -4,38 +4,26 @@ import asyncio
 import math
 
 
+class CityError(Exception):
+    pass
+
+
 class CityManager:
     def __init__(self, api_key):
         self.api_key = api_key
         self.city_list = {}
 
-    async def get_city_coordinates(self, city):
-        with aiohttp.ClientSession() as session:
-            response = await session.get(
-                'https://maps.googleapis.com/maps/api/geocode/json?address=%s&key=%s' % (city, self.api_key))
-            try:
-                result = await response.json()
-            except json.decoder.JSONDecodeError as e:
-                print(e)
-            else:
-                if result['status'] == "OK":
-                    coordinates = [result["results"][0]["geometry"]["location"]["lat"],
-                                   result["results"][0]["geometry"]["location"]["lng"]]
-                    return coordinates
-                elif result["status"] == "ZERO_RESULTS":
-                    return None
-            finally:
-                response.release()
-
     async def add_or_update_city(self, city):
         if city not in list(self.city_list.keys()):
-            coordinates = await self.get_city_coordinates(city)
-            if coordinates is None:
-                return None
-            self.city_list[city] = {"lat": coordinates[0], "lng": coordinates[1], "links": 1}
+            try:
+                await self.check_city(city)
+            except CityError:
+                raise
+            else:
+                await self.calculate_nearest_city(city)
+                self.city_list[city]["links"] = 1
         else:
             self.city_list[city]["links"] += 1
-        return 1
 
     async def unlink_city(self, city):
         self.city_list[city]["links"] -= 1
@@ -46,30 +34,47 @@ class CityManager:
         for city in cities:
             await self.add_or_update_city(city)
 
-    @staticmethod
-    async def calculate_distance(origin, destination):
-        earth_radius = 6378.137e3  # use Equatorial radius
-        lat1 = math.radians(origin["lat"])
-        lat2 = math.radians(destination['lat'])
-        delta_lat = math.radians(destination['lat'] - origin["lat"])
-        delta_lng = math.radians(destination['lng'] - origin["lng"])
+    async def check_city(self, city):
+        with aiohttp.ClientSession() as session:
+            response = await session.get(
+                'https://maps.googleapis.com/maps/api/geocode/json?address=%s&key=%s'
+                % (city, self.api_key)
+            )
+            try:
+                result = await response.json()
+            except json.decoder.JSONDecodeError as e:
+                print(e)
+            else:
+                if result["status"] != "OK":
+                    raise CityError
 
-        a = math.sin(delta_lat / 2) * math.sin(delta_lat / 2) + math.cos(lat1) * math.cos(lat2) * math.sin(
-            delta_lng / 2) * math.sin(delta_lng / 2)
-        c = 2 * math.atan2(math.sqrt(a), math.sqrt((1 - a)))
-        distance = earth_radius * c
-        return distance
-
-    async def find_nearest_city(self, origin_name):
-        origin = self.city_list[origin_name]
+    async def calculate_nearest_city(self, origin):
         nearest_city = None
         min_dist = float('inf')
-        for city_name, value in self.city_list.items():
-            dist = await self.calculate_distance(origin, self.city_list[city_name])
-            if min_dist > dist and dist != 0:
-                min_dist = dist
-                nearest_city = city_name
-            elif min_dist > dist and dist == 0 and origin["links"] > 1:
-                min_dist = dist
-                nearest_city = city_name
-        return nearest_city, min_dist
+        destinations = list(self.city_list.keys())
+
+        if destinations:
+            dst_str = '|'.join(destinations)
+            with aiohttp.ClientSession() as session:
+                response = await session.get(
+                    'https://maps.googleapis.com/maps/api/distancematrix/json?origins=%s&destinations=%s&key=%s'
+                    % (origin, dst_str, self.api_key)
+                )
+                try:
+                    result = await response.json()
+                except json.decoder.JSONDecodeError as e:
+                    print(e)
+                else:
+                    for (dst, distance) in zip(destinations, result["rows"][0]["elements"]):
+                        if min_dist > distance["distance"]["value"]:
+                            min_dist = distance["distance"]["value"]
+                            nearest_city = dst
+                    if self.city_list[nearest_city]["nearest_city"][1] > min_dist:
+                        self.city_list[nearest_city]["nearest_city"] = (origin, min_dist)
+        self.city_list[origin] = {"nearest_city": (nearest_city, min_dist)}
+
+    async def find_nearest_city(self, city):
+        if self.city_list[city]["links"] > 1:
+            return city, 0
+        else:
+            return self.city_list[city]["nearest_city"]
