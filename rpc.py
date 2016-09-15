@@ -41,5 +41,5 @@ class Rpc(Service):
         },
     })
     async def save(self, ctx, data):
-        result = await AgentProxy.agent_manager.save_agents('agents.csv')
+        result = await AgentProxy.agent_manager.save_agents(data["filename"])
         return result
