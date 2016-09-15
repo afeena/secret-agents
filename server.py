@@ -5,6 +5,7 @@ import json
 from aiohttp import web
 from agent_proxy import AgentProxy
 from rpc import Rpc
+from config import Config
 
 
 class SecretAgentsWeb(web.Application):
@@ -37,9 +38,10 @@ class SecretAgentsWeb(web.Application):
 
 async def init(loop):
     app = SecretAgentsWeb(loop)
-    srv = await loop.create_server(app.make_handler(),
-                                   "0.0.0.0", 8080)
-    print("Server started at http://0.0.0.0:8080")
+    interface = Config.config["server"]["interface"]
+    port = Config.config["server"]["port"]
+    srv = await loop.create_server(app.make_handler(), interface, port)
+    print("Server started at %s:%s" % (interface, str(port)))
     return srv
 
 
