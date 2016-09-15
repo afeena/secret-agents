@@ -1,0 +1,8 @@
+[database]
+# By default we use sqlite3 database. Put the filename here.
+name = filename
+
+
+[google_maps_api]
+# Put Google Maps API key here
+key = your_api_key
