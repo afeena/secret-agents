@@ -2,3 +2,4 @@ aiohttp
 aiohttp_jrpc
 ngram
 pylev
+requests
