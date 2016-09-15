@@ -21,7 +21,7 @@ async def init(loop):
     app.router.add_route('POST', "/api", Rpc)
     app.router.add_route('POST', "/upload", upload_handler)
     public_folder = os.path.join(os.getcwd(), 'public')
-    web_folder = os.path.join(os.getcwd(), 'web/')
+    web_folder = os.path.join(os.getcwd(), 'web')
     if not os.path.exists(public_folder):
         os.mkdir(public_folder)
 
@@ -38,5 +38,5 @@ loop.run_until_complete(init(loop))
 try:
     loop.run_forever()
 except KeyboardInterrupt:
-    loop.run_until_complete(agent_manager.end_seans())
+    loop.run_until_complete(AgentProxy.agent_manager.end_seans())
     pass
