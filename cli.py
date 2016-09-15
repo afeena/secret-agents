@@ -75,7 +75,9 @@ if __name__ == '__main__':
     commands = {
         "add": add,
         "where": where,
-        "help": help
+        "help": help,
+        "save": save,
+        "load": upload
     }
 
     try:
