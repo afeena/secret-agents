@@ -7,26 +7,36 @@ from agent_proxy import AgentProxy
 from rpc import Rpc
 
 
-async def upload_handler(request):
-    data = await request.post()
-    csv = data["csv"]
-    csv_file = csv.file
-    content = csv_file.read()
-    result = await AgentProxy.agent_manager.upload_agents(content.decode('utf-8').split('\n'))
-    return web.Response(content_type='application/json', body=json.dumps({"count": result}).encode('utf-8'))
+class SecretAgentsWeb(web.Application):
+    def __init__(self, loop):
+        super().__init__(loop=loop)
+
+        self.router.add_route('POST', "/api", Rpc)
+        self.router.add_route('POST', "/upload", self.upload_handler)
+        public_folder = os.path.join(os.getcwd(), 'public')
+        web_folder = os.path.join(os.getcwd(), 'web')
+        if not os.path.exists(public_folder):
+            os.mkdir(public_folder)
+
+        self.router.add_static("/public", public_folder)
+        self.router.add_static("/web", web_folder)
+        self.router.add_route('GET', '/', self.show_console)
+
+    async def show_console(self, request):
+        with open('web/index.html', mode='rb') as index_page:
+            return web.Response(content_type='text/html', body=index_page.read())
+
+    async def upload_handler(self, request):
+        data = await request.post()
+        csv = data["csv"]
+        csv_file = csv.file
+        content = csv_file.read()
+        result = await AgentProxy.agent_manager.upload_agents(content.decode('utf-8').split('\n'))
+        return web.Response(content_type='application/json', body=json.dumps({"count": result}).encode('utf-8'))
 
 
 async def init(loop):
-    app = web.Application(loop=loop)
-    app.router.add_route('POST', "/api", Rpc)
-    app.router.add_route('POST', "/upload", upload_handler)
-    public_folder = os.path.join(os.getcwd(), 'public')
-    web_folder = os.path.join(os.getcwd(), 'web')
-    if not os.path.exists(public_folder):
-        os.mkdir(public_folder)
-
-    app.router.add_static("/public", public_folder)
-    app.router.add_static("/", web_folder)
+    app = SecretAgentsWeb(loop)
     srv = await loop.create_server(app.make_handler(),
                                    "0.0.0.0", 8080)
     print("Server started at http://0.0.0.0:8080")
