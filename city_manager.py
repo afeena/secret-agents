@@ -1,7 +1,5 @@
 import aiohttp
 import json
-import asyncio
-import math
 
 
 class CityError(Exception):

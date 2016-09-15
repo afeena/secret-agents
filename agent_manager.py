@@ -1,5 +1,4 @@
 import configparser
-import asyncio
 import os
 import csv
 import ngram

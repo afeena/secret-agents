@@ -43,4 +43,4 @@ class DBManager:
         return result
 
     def clear_table(self):
-        self.execute("DELETE FROM agents",tuple())
+        self.execute("DELETE FROM agents", tuple())
