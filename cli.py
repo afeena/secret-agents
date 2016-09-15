@@ -1,56 +1,62 @@
 import requests
 import asyncio
 import urllib.request
-from aiohttp_jrpc import Client, InvalidResponse
-
-api_url = "http://192.168.1.3:8080/api"
-upload_url = "http://192.168.1.3:8080/upload"
-download_root = "http://192.168.1.3:8080/"
-remote = Client(api_url)
+import argparse
+from aiohttp_jrpc import Client, InvalidResponse, InvalidParams
 
 
-def request_api(method, params):
-    loop = asyncio.get_event_loop()
-    result = None
-    try:
-        result = loop.run_until_complete(remote.call(method, params))
-    except InvalidResponse as e:
-        print("Error with request", e)
-    return result
+class WrongResult(Exception):
+    pass
 
 
-def add(data):
-    result = request_api('add', {"name": data[0], "city": data[1]})
-    if not result:
-        return
-    print(result.result)
+class RpcCalls:
+    def __init__(self, host, port):
+        self.api_url = "http://%s:%s/api" % (host, str(port))
+        self.upload_url = "http://%s:%s/upload" % (host, str(port))
+        self.download_root = "http://%s:%s/" % (host, str(port))
+        self.remote = Client(self.api_url)
 
+    def request_api(self, method, params):
+        loop = asyncio.get_event_loop()
+        result = None
+        try:
+            result = loop.run_until_complete(self.remote.call(method, params))
+        except InvalidResponse as e:
+            print("Error with request", e)
+        except InvalidParams as e:
+            print(e)
+        return result
 
-def where(data):
-    result = request_api('where', {"name": data[0]})
-    if not result:
-        return
-    print(result.result)
+    def add(self, data):
+        result = self.request_api('add', {"name": data[0], "city": data[1]})
+        if not result:
+            return
+        print(result.result)
 
+    def where(self, data):
+        result = self.request_api('where', {"name": data[0]})
+        if not result or result is None:
+            return
+        print(result.result)
 
-def help(data):
-    result = request_api('help', {"name": data[0]})
-    if not result:
-        return
-    print(result.result)
+    def help(self, data):
+        result = self.request_api('help', {"name": data[0]})
+        if not result:
+            return
+        print(result.result)
 
+    def load(self, data):
+        files = {'csv': open(data[0], 'rb')}
+        r = requests.post(self.upload_url, files=files)
+        print(r.text)
+        print("OK")
 
-def upload(data):
-    files = {'file': open(data[0], 'rb')}
-    r = requests.post(upload_url, files=files)
-    print(r.text)
-
-
-def save(data):
-    result = request_api("save", data[0])
-    if not result:
-        return
-    urllib.request.urlretrieve(download_root + result.result, data[0])
+    def save(self, data):
+        result = self.request_api("save", {"filename": data[0]})
+        if not result:
+            return
+        urllib.request.urlretrieve(self.download_root + result.result, data[0])
+        print("OK")
 
 
 if __name__ == '__main__':
@@ -71,21 +77,20 @@ if __name__ == '__main__':
  \____/\___/|_| |_|___/\___/|_|\___|
 
     """)
-
-    commands = {
-        "add": add,
-        "where": where,
-        "help": help,
-        "save": save,
-        "load": upload
-    }
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--host", help="server host", default='localhost')
+    parser.add_argument("--port", help="server port", default=8080)
+    args = parser.parse_args()
+    rpc = RpcCalls(args.host, args.port)
 
     try:
         while (True):
             arguments = input()
             arguments = arguments.split(' ')
             command = arguments.pop(0)
-            params = arguments
-            commands[command](params)
+            try:
+                getattr(rpc, command)(arguments)
+            except AttributeError as e:
+                print("Command %s not found. Try another command" % command)
     except KeyboardInterrupt:
         print("Bye-bye")
