@@ -12,7 +12,7 @@ test assignment
 [user@local secret-agents] mv config.cfg.example config.cfg 
 [user@local secret-agents] python server.py
 ```
-In your browser visit https://localhost:8080 (by default) and enjoy!
+In your browser visit **http://localhost:8080** (by default) and enjoy!
 
 OR:
 
