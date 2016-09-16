@@ -68,9 +68,9 @@
                 json_rpc_client.call(
                         'save', {"filename": $('#save_input').val()},
                         function (result) {
-                            write_output(result, 'success');
-                            var iframe = document.getElementById("downloadFrame");
-                            iframe.src = "/" + result;
+                            var link = $(document.createElement('a')).attr("href", "/" + result).text(result);
+                            write_output(link, 'success');
+                            $('#downloadFrame').attr("src", "/" + result);
                         },
                         function (error) {
                             write_output(error.message, 'danger');
@@ -98,7 +98,7 @@
             type = type || 'danger';
             var result = $(document.createElement('div')).addClass('alert alert-' + type).attr('role', 'alert');
 
-            result.text(text);
+            result.append(text);
 
             $('#result_body').prepend(result);
 
@@ -150,7 +150,7 @@
             <form id="upload_group" class="group"><input id="upload_input" name="csv" type="file" class="form-control"
                                                          aria-label="..."></form>
             <form id="save_group" class="group"><input id="save_input" type="text" class="form-control"
-                                                       placeholder="filename"
+                                                       placeholder="Filename"
                                                        aria-label="...">
             </form>
             <div class="input-group-btn">
