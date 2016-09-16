@@ -71,7 +71,7 @@ class AgentManager:
 
     async def find_helpers(self, name):
         try:
-            self.validate_data([name])
+            await self.validate_data([name])
         except EmptyData:
             return "Empty field(s)"
         agent = self.db_manager.find_agent_by_name(name)
