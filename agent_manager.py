@@ -11,23 +11,33 @@ class EmptyData(Exception):
     pass
 
 
+def data_validated(func):
+    async def wrapper(self, name, city):
+        try:
+            await self.validate_data([name, city])
+        except EmptyData:
+            return "Empty field(s)"
+        else:
+            await func()
+
+    return wrapper
+
+
 class AgentManager:
     def __init__(self):
         config = Config.config
         self.db_manager = DBManager(config['database']['name'])
         self.city_manager = CityManager(config['google_maps_api']['key'])
 
-    async def validate_data(self, data):
+    @staticmethod
+    async def validate_data(data):
         for data_str in data:
             data_str = data_str.strip()
             if not data_str:
                 raise EmptyData
 
+    @data_validated
     async def add_agent(self, name, city):
-        try:
-            await self.validate_data([name, city])
-        except EmptyData:
-            return "Empty field(s)"
         agent = self.db_manager.find_agent_by_name(name)
         try:
             await self.city_manager.add_or_update_city(city)
@@ -41,11 +51,8 @@ class AgentManager:
                 self.db_manager.update_agent(city, name)
             return "OK"
 
+    @data_validated
     async def suggest_agent(self, name):
-        try:
-            await self.validate_data([name])
-        except EmptyData:
-            return "Empty field(s)"
         all_agents = self.db_manager.get_all_agents()
         list_names = [x[0] for x in all_agents]
         ngram_dict = ngram.NGram(list_names)
@@ -54,11 +61,8 @@ class AgentManager:
             if pylev.classic_levenshtein(suggested_name[0], name) <= 3:
                 return suggested_name[0]
 
+    @data_validated
     async def get_agent(self, name):
-        try:
-            await self.validate_data([name])
-        except EmptyData:
-            return "Empty field(s)"
         agent = self.db_manager.find_agent_by_name(name)
         if agent:
             return agent[0][1]
@@ -69,11 +73,8 @@ class AgentManager:
             else:
                 return '%s not found. \n Nothing to suggest.' % name
 
+    @data_validated
     async def find_helpers(self, name):
-        try:
-            await self.validate_data([name])
-        except EmptyData:
-            return "Empty field(s)"
         agent = self.db_manager.find_agent_by_name(name)
         if not agent:
             result = await self.suggest_agent(name)
@@ -100,11 +101,8 @@ class AgentManager:
             count += 1
         return count
 
+    @data_validated
     async def save_agents(self, filename):
-        try:
-            await self.validate_data([filename])
-        except EmptyData:
-            return "Empty field(s)"
         agents = self.db_manager.get_all_agents()
         filepath = os.path.normpath(os.path.join('public/', filename))
         if agents:
